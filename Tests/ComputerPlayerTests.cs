@@ -52,6 +52,21 @@ public class ComputerPlayerTests
         }
     }
 
+    // ── Full board throws ────────────────────────────────────────────────────
+
+    [Fact]
+    public void PickCell_ThrowsInvalidOperationException_WhenBoardIsFull()
+    {
+        var cells = new char[]
+        {
+            'X', 'O', 'X',
+            'O', 'X', 'O',
+            'X', 'O', 'X'
+        };
+
+        Assert.Throws<InvalidOperationException>(() => ComputerPlayer.PickCell(cells));
+    }
+
     // ── Exactly one empty cell remaining ─────────────────────────────────────
 
     [Fact]
