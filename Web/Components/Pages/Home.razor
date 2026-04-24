@@ -61,6 +61,7 @@ else
 
     private void StartGame(char playerSymbol)
     {
+        _board.Reset();
         _board.PlayerSymbol = playerSymbol;
         _board.ComputerSymbol = playerSymbol == 'X' ? 'O' : 'X';
         _board.Status = GameStatus.Active;
@@ -74,6 +75,7 @@ else
         _board.Status = GameRules.CheckResult(_board.Cells, _board.PlayerSymbol, _board.ComputerSymbol);
         if (_board.Status == GameStatus.Active)
         {
+            // CheckResult returned Active, so at least one empty cell exists.
             int computerCell = ComputerPlayer.PickCell(_board.Cells);
             _board.Cells[computerCell] = _board.ComputerSymbol;
             _board.Status = GameRules.CheckResult(_board.Cells, _board.PlayerSymbol, _board.ComputerSymbol);
