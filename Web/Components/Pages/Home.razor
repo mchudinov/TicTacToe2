@@ -53,9 +53,9 @@ else
     private string StatusText => _board.Status switch
     {
         GameStatus.Active => "Your turn",
-        GameStatus.PlayerWon => "You win!",
-        GameStatus.ComputerWon => "Computer wins!",
-        GameStatus.Draw => "Draw!",
+        GameStatus.PlayerWon => "You win",
+        GameStatus.ComputerWon => "Computer wins",
+        GameStatus.Draw => "Draw",
         _ => ""
     };
 
