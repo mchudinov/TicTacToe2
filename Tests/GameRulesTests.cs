@@ -94,4 +94,31 @@ public class GameRulesTests
         var result = GameRules.CheckResult(cells, playerSymbol: X, computerSymbol: O);
         Assert.Equal(GameStatus.Active, result);
     }
+
+    // ── '\0' false positive guard ─────────────────────────────────────────────
+
+    [Fact]
+    public void CheckResult_Active_WhenAllCellsAreNullChar()
+    {
+        // Fresh board with no symbols placed; '\0' should never count as a win
+        var cells = new char[9]; // all '\0' by default
+        var result = GameRules.CheckResult(cells, playerSymbol: '\0', computerSymbol: '\0');
+        Assert.Equal(GameStatus.Active, result);
+    }
+
+    // ── Priority: player is checked before computer ───────────────────────────
+
+    [Fact]
+    public void CheckResult_PlayerWon_WhenBothPlayerAndComputerHaveWinLine()
+    {
+        // Row 0 all X (player win-line), row 1 all O (computer win-line)
+        var cells = new char[]
+        {
+            X, X, X,
+            O, O, O,
+            '\0', '\0', '\0'
+        };
+        var result = GameRules.CheckResult(cells, playerSymbol: X, computerSymbol: O);
+        Assert.Equal(GameStatus.PlayerWon, result);
+    }
 }

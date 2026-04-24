@@ -16,12 +16,16 @@ public static class GameRules
 
     public static GameStatus CheckResult(char[] cells, char playerSymbol, char computerSymbol)
     {
+        ArgumentNullException.ThrowIfNull(cells);
+        if (cells.Length != 9)
+            throw new ArgumentException("cells must have exactly 9 elements.", nameof(cells));
+
         foreach (var line in WinLines)
         {
-            if (cells[line[0]] == playerSymbol && cells[line[1]] == playerSymbol && cells[line[2]] == playerSymbol)
+            if (cells[line[0]] != '\0' && cells[line[0]] == playerSymbol && cells[line[1]] == playerSymbol && cells[line[2]] == playerSymbol)
                 return GameStatus.PlayerWon;
 
-            if (cells[line[0]] == computerSymbol && cells[line[1]] == computerSymbol && cells[line[2]] == computerSymbol)
+            if (cells[line[0]] != '\0' && cells[line[0]] == computerSymbol && cells[line[1]] == computerSymbol && cells[line[2]] == computerSymbol)
                 return GameStatus.ComputerWon;
         }
 
