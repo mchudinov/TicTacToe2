@@ -70,6 +70,9 @@ else
 
     private void PlayerClickCell(int i)
     {
+        if (_board.Status != GameStatus.Active || !_board.IsPlayerTurn || _board.Cells[i] != '\0')
+            return;
+
         _board.Cells[i] = _board.PlayerSymbol;
         _board.IsPlayerTurn = false;
         _board.Status = GameRules.CheckResult(_board.Cells, _board.PlayerSymbol, _board.ComputerSymbol);
