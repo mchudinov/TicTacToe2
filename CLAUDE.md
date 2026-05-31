@@ -4,82 +4,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-```bash
-# Run the web app (available at http://localhost:8089)
-dotnet run --project Web/Web.csproj
+Solution is `WebMudBlazorBasic.slnx` (two projects: `Library`, `Web`). Requires the .NET 10 SDK.
 
-# Build the solution
-dotnet build TicTacToe.slnx
+- Restore: `dotnet restore WebMudBlazorBasic.slnx`
+- Build: `dotnet build WebMudBlazorBasic.slnx`
+- Run the web app (listens on `http://localhost:8089`): `dotnet run --project Web/Web.csproj`
+- Run with the Development profile: `dotnet run --project Web/Web.csproj --launch-profile "http devel"`
+- Build container image: `docker build -f Web/Dockerfile -t webmudblazorbasic .` (build context must be the repo root because the Dockerfile copies both `Web/` and `Library/`).
 
-# Build for release / Docker
-dotnet publish Web/Web.csproj -c Release
-
-# Docker build
-docker build -t tictactoe -f Web/Dockerfile .
-```
-
-No test projects exist yet.
+There is no test project in the solution yet.
 
 ## Architecture
 
-Two projects in `TicTacToe.slnx`:
+Server-interactive Blazor app (`.NET 10`, MudBlazor 9) with a shared `Library` for cross-cutting host/config helpers.
 
-- **`Library/`** — shared utility class library. Contains configuration extension methods (`Extensions.cs`), Azure Blob Storage name sanitization, and OpenTelemetry setup (activated when Azure Monitor connection string is present).
-- **`Web/`** — ASP.NET Core 10 Blazor Server application. Entry point is `Program.cs`, which wires up Serilog, MudBlazor, Azure OpenAI client, and the `Settings` model from `appsettings.json`. Serves on port 8089.
+- `Web/Program.cs` is the single entry point and does **not** use the minimal top-level-statements shape — it is a classic `Program.Main`. Noteworthy bootstrap order:
+  1. A Serilog *bootstrap* logger is created first so configuration loading itself can be logged.
+  2. `IConfiguration` is built manually (`appsettings.json` + `appsettings.{DOTNET_ENVIRONMENT}.json` + env vars) and bound to the strongly-typed `Settings` record (`Web/Settings.cs`) **before** `WebApplication.CreateBuilder`. This `Settings` instance is then registered as a singleton.
+  3. The real Serilog logger is reattached via `builder.Logging.ClearProviders()` + `AddSerilog` reading from `builder.Configuration`.
+  4. `builder.AddOpenTelemetry()` (see `Library/Extensions.cs`) only wires Azure Monitor + OTLP if `APPLICATIONINSIGHTS_CONNECTION_STRING` is present — locally the app runs with no telemetry exporter.
+  5. An `AzureOpenAIClient` is registered as a singleton using `Settings.AzureOpenAI` (endpoint + API key). It is **not yet consumed** anywhere — it is scaffolding for future chat functionality.
+  6. `AddRazorComponents().AddInteractiveServerComponents()` + `AddMudServices()` wire MudBlazor and interactive Blazor Server rendering.
+- Routing and rendering: `Components/App.razor` is the root document (loads MudBlazor CSS/JS, has `<ReconnectModal />` for Blazor Server reconnection). `Components/Routes.razor` points the router at `Layout.MainLayout` and `Pages.NotFound`. Pages live in `Web/Components/Pages/`; shared layout in `Web/Components/Layout/MainLayout.razor` (MudBlazor AppBar with a dark-mode toggle persisted in `localStorage`).
+- `MainLayout` navigation bar has buttons linking to `/How_it_works` and `/Demo` — those routes do not yet have corresponding page components.
+- Razor component `_Imports.razor` globally imports `MudBlazor`, `Web`, `Web.Components`, `Web.Components.Layout`, and `Microsoft.JSInterop` — new components don't need those `@using` lines.
+- Components follow the Blazor scoped-asset pattern: a component can have a co-located `.razor.css` (scoped styles) and `.razor.js` (JS module loaded via `IJSRuntime`) file. `ReconnectModal` demonstrates both.
+- Diagnostics endpoints mapped from `Library.Extensions.MapDefaultEndpoints`: `GET /livez`, `GET /uptime`, `GET /error` (exception handler). `Program.cs` adds `GET /info` describing them. `UseStatusCodePagesWithReExecute("/not-found")` routes unknown paths through the `NotFound` page.
+- The `Library` project intentionally has no runtime dependency on ASP.NET Core for its utility methods (`AllConfigurationKeys`, `OutputEnvironmentVariables`, `LogStrings`, `ToAzureBlobSafeName`) but does reference `Azure.Monitor.OpenTelemetry.AspNetCore` for the `AddOpenTelemetry` extension — keep that split in mind when adding helpers.
 
-### Frontend
+## Configuration
 
-Blazor Server with InteractiveServer rendering. MudBlazor 9.3.0 provides all UI components. Dark mode state is persisted in localStorage. The router (`Routes.razor`) handles navigation; `App.razor` is the root HTML document.
+- `Settings` record (`Web/Settings.cs`) shape: `Environment` (string) + `AzureOpenAI` nested record with `Endpoint`, `ApiKey`, and `DeploymentNameChat` — all default to `string.Empty`.
+- `Web/appsettings.json` has a committed placeholder `Settings:AzureOpenAI:ApiKey = "dummy"`. Override via environment (`Settings__AzureOpenAI__ApiKey=...`) or an `appsettings.{env}.json` rather than editing the committed file.
+- `Settings` is required — if the `Settings` section is missing or can't bind, `Program.Main` throws `InvalidOperationException` during startup.
+- Kestrel is pinned to `http://*:8089` in `appsettings.json`; the Dockerfile and launch profiles assume the same port.
 
-### Game implementation status
+## Container notes
 
-The game logic is **not yet implemented**. `Web/Components/Pages/Home.razor` is a placeholder. The POC specification in `docs/poc.md` defines the intended single-player (vs. computer) game: symbol selection, a 3×3 clickable grid, and two computer AI levels (random moves vs. strategic block/win). Azure OpenAI (Azure.AI.OpenAI 2.1.0) is already wired into DI for potential use in an AI-powered computer player.
-
-### Observability
-
-- Structured logging via Serilog (console + debug sinks).
-- OpenTelemetry tracing via `Azure.Monitor.OpenTelemetry.AspNetCore` — only activates when `APPLICATIONINSIGHTS_CONNECTION_STRING` is set.
-- Diagnostic endpoints: `/livez`, `/uptime`, `/error` (registered in `Library/Extensions.cs`).
-
-### Configuration
-
-`Settings.cs` maps `appsettings.json`. Azure OpenAI credentials (endpoint, API key, deployment name) live under the `AzureOpenAI` section.
-
-
-## Development Rules
-
-### Test-Driven Development
-
-Always follow TDD: write a failing test first, verify it fails for the right reason, then write the minimal production code to make it pass. Never write production code before a failing test exists. Delete any production code written before its test and start over.
-
-## Project Instructions
-
-### Context7 Integration
-
-Always use Context7 MCP when I need library/API documentation, code generation, setup, or configuration steps without me having to explicitly ask.
-
-### Plan Step
-
-When the user asks to "plan a step" (or equivalent phrasing like "add a step", "create a step"):
-1. Add the step to `docs/plans/steps.md` — a new row in the table and a full detail section at the bottom.
-2. Create a GitHub project item in the TicTacToe project with title "Step-N Short description", a short description body, and status set to Backlog.
-
-Both actions are always done together, without the user having to ask for each separately.
-
-### GitHub integration
-
-When creating items in GitHub always use  TicTacToe GitHub project. Create items in Backlog and give a name to each item "Step-number short description". Add a short description to each item. Try to figure out what was the latest used step number in the current session and add +1 to each step.
-
-When the user asks to work on a Step:
-1. Create a dedicated GitHub branch named after the step (e.g. `Step-1-Create-AccountSnapshot-data-model`)
-2. Move the corresponding GitHub project item to "In-progress" state
-3. Do all coding on that branch
-
-When programming is done:
-1. Move the GitHub project item to "In-review" state
-2. Create a Pull Request for the branch — the user will approve and merge it; never merge it yourself
-
-When the user asks to check if a PR is approved:
-1. Check PR review status with `gh pr view <number> --json reviewDecision,mergeStateStatus`
-2. If approved and merged: switch to `main`, pull latest, delete the local and remote feature branch, move the GitHub project item to "Done" state, then remind the user to run `/compact`
-3. If not yet approved: report the current status and wait for the user to ask again
+`Web/Dockerfile` uses the chiseled ASP.NET 10 runtime image and runs as the non-root `$APP_UID`. The `Container prod` launch profile in `Web/Properties/launchSettings.json` is what Visual Studio uses to run under Docker; it sets both `ASPNETCORE_ENVIRONMENT=Production` and `DOTNET_ENVIRONMENT=Production` (the latter matters because `Program.Main` reads `DOTNET_ENVIRONMENT`, not `ASPNETCORE_ENVIRONMENT`, to pick the per-environment `appsettings` file).
