@@ -1,7 +1,91 @@
-﻿@page "/"
+@page "/"
+@using Library
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Tic-Tac-Toe</PageTitle>
 
-<h1>Hello, world!</h1>
+<MudContainer MaxWidth="MaxWidth.Small" Class="mt-8">
+    @if (_board.Status == GameStatus.SymbolSelection)
+    {
+        <MudText Typo="Typo.h4" Align="Align.Center" Class="mb-4">Choose your symbol</MudText>
+        <MudStack Row="true" Justify="Justify.Center" Spacing="2">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large" OnClick="@(() => StartGame('X'))">X</MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Secondary" Size="Size.Large" OnClick="@(() => StartGame('O'))">O</MudButton>
+        </MudStack>
+    }
+    else
+    {
+        <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-4">@StatusText</MudText>
 
-Welcome to your new app.
+        <MudGrid Spacing="2" Justify="Justify.Center">
+            @for (int i = 0; i < 9; i++)
+            {
+                var index = i;
+                <MudItem xs="4">
+                    <MudButton Variant="Variant.Outlined"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Style="height: 96px; font-size: 2.5rem;"
+                               Disabled="@(!CanClickCell(index))"
+                               OnClick="@(() => OnCellClick(index))">
+                        @(_board.Cells[index] == '\0' ? string.Empty : _board.Cells[index].ToString())
+                    </MudButton>
+                </MudItem>
+            }
+        </MudGrid>
+
+        <MudStack Row="true" Justify="Justify.Center" Class="mt-4">
+            <MudButton Variant="Variant.Filled" Color="Color.Tertiary" OnClick="Reset">Restart</MudButton>
+        </MudStack>
+    }
+</MudContainer>
+
+@code {
+    private readonly GameBoard _board = new();
+
+    private string StatusText => _board.Status switch
+    {
+        GameStatus.Active => "Your turn",
+        GameStatus.PlayerWon => "You win",
+        GameStatus.ComputerWon => "Computer wins",
+        GameStatus.Draw => "Draw",
+        _ => string.Empty
+    };
+
+    private void StartGame(char playerSymbol)
+    {
+        _board.Reset();
+        _board.PlayerSymbol = playerSymbol;
+        _board.ComputerSymbol = playerSymbol == 'X' ? 'O' : 'X';
+        _board.Status = GameStatus.Active;
+        _board.IsPlayerTurn = true;
+    }
+
+    private bool CanClickCell(int index)
+        => _board.Status == GameStatus.Active
+           && _board.IsPlayerTurn
+           && _board.Cells[index] == '\0';
+
+    private void OnCellClick(int index)
+    {
+        if (!CanClickCell(index))
+        {
+            return;
+        }
+
+        _board.Cells[index] = _board.PlayerSymbol;
+        _board.IsPlayerTurn = false;
+        _board.Status = GameRules.CheckResult(_board.Cells, _board.PlayerSymbol, _board.ComputerSymbol);
+
+        if (_board.Status != GameStatus.Active)
+        {
+            return;
+        }
+
+        var computerIndex = ComputerPlayer.PickCell(_board.Cells);
+        _board.Cells[computerIndex] = _board.ComputerSymbol;
+        _board.Status = GameRules.CheckResult(_board.Cells, _board.PlayerSymbol, _board.ComputerSymbol);
+        _board.IsPlayerTurn = _board.Status == GameStatus.Active;
+    }
+
+    private void Reset() => _board.Reset();
+}
