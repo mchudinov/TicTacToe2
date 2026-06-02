@@ -21,7 +21,7 @@ Solution is `TicTacToe.slnx` (currently two projects: `Library`, `Web`; a `Tests
 
 - Restore: `dotnet restore TicTacToe.slnx`
 - Build: `dotnet build TicTacToe.slnx`
-- Run the web app (listens on `http://localhost:8089`): `dotnet run --project Web/Web.csproj`
+- Run the web app (listens on `http://localhost:18089`): `dotnet run --project Web/Web.csproj`
 - Run with the Development profile: `dotnet run --project Web/Web.csproj --launch-profile "http devel"`
 - Build container image: `docker build -f Web/Dockerfile -t tictactoe .` (build context must be the repo root because the Dockerfile copies both `Web/` and `Library/`).
 
@@ -49,7 +49,7 @@ Server-interactive Blazor app (`.NET 10`, MudBlazor 9) with a shared `Library` f
 - `Settings` record (`Web/Settings.cs`) shape: `Environment` (string) + `AzureOpenAI` nested record with `Endpoint`, `ApiKey`, and `DeploymentNameChat` — all default to `string.Empty`.
 - `Web/appsettings.json` has a committed placeholder `Settings:AzureOpenAI:ApiKey = "dummy"`. Override via environment (`Settings__AzureOpenAI__ApiKey=...`) or an `appsettings.{env}.json` rather than editing the committed file.
 - `Settings` is required — if the `Settings` section is missing or can't bind, `Program.Main` throws `InvalidOperationException` during startup.
-- Kestrel is pinned to `http://*:8089` in `appsettings.json`; the Dockerfile and launch profiles assume the same port.
+- Kestrel is pinned to `http://*:18089` in `appsettings.json`; the Dockerfile and launch profiles assume the same port.
 
 ## Container notes
 
